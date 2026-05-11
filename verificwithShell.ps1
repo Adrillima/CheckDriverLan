@@ -1,12 +1,22 @@
-# --- 1. CONFIGURAÇÃO DE FILTROS ---
+# Verifica se o script estÃ¡ rodando como Administrador (Mantenha este bloco no topo)
+$currentPrincipal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
+if (-not $currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    Write-Host "Solicitando privilÃ©gios de administrador..." -ForegroundColor Cyan
+    Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs
+    exit
+}
+
+Write-Host "Rodando com permissÃµes elevadas!" -ForegroundColor Green
+
+# --- 1. CONFIGURAÃ‡ÃƒO DE FILTROS ---
 # Filtro para Wi-Fi
 $wifiFilter = { $_.Name -like "*Wi-Fi*" -or $_.InterfaceDescription -like "*Wireless*" -or $_.InterfaceDescription -like "*WLAN*" }
 
 # Filtro para Ethernet
 $ethFilter = { $_.Name -like "*Ethernet*" -or $_.InterfaceDescription -like "*Gigabit*" -or $_.InterfaceDescription -like "*PCIe FE*" }
 
-# --- 2. EXECUÇÃO ---
-Write-Host "Iniciando verificação de adaptadores de rede..." -ForegroundColor Cyan
+# --- 2. EXECUÃ‡ÃƒO ---
+Write-Host "`nIniciando verificaÃ§Ã£o de adaptadores de rede..." -ForegroundColor Cyan
 Write-Host "------------------------------------------------"
 
 # Busca todos os adaptadores
@@ -22,15 +32,27 @@ foreach ($adapter in $allAdapters) {
         
         Write-Host "Encontrado: [$tipo] $($adapter.Name)" -NoNewline
         
-        # Verifica se está desativado (Disabled)
+        # Verifica se estÃ¡ desativado (Disabled)
         if ($adapter.Status -eq "Disabled") {
-            Write-Host " -> [DESATIVADO]. Ativando agora..." -ForegroundColor Yellow
-            try {
-                Enable-NetAdapter -Name $adapter.Name -Confirm:$false
-                Write-Host "Sucesso: $($adapter.Name) foi ativado!" -ForegroundColor Green
-            } catch {
-                Write-Host "Erro: Não foi possível ativar. Você está rodando como Administrador?" -ForegroundColor Red
+            Write-Host " -> [DESATIVADO]." -ForegroundColor Yellow
+            
+            # --- INTERAÃ‡ÃƒO COM O USUÃRIO ---
+            $resposta = Read-Host "  Deseja ativar o adaptador $($adapter.Name) agora? (S/N)"
+            
+            # Verifica se a resposta comeÃ§a com 'S' ou 's' (Sim/SIM/s/S)
+            if ($resposta -match "^[Ss]") {
+                Write-Host "  Ativando..." -ForegroundColor Cyan
+                try {
+                    Enable-NetAdapter -Name $adapter.Name -Confirm:$false
+                    Write-Host "  Sucesso: $($adapter.Name) foi ativado!" -ForegroundColor Green
+                } catch {
+                    Write-Host "  Erro: NÃ£o foi possÃ­vel ativar." -ForegroundColor Red
+                }
+            } else {
+                Write-Host "  AÃ§Ã£o ignorada. O adaptador continuarÃ¡ desativado." -ForegroundColor DarkGray
             }
+            # --------------------------------
+            
         } else {
             Write-Host " -> [OK] (Status: $($adapter.Status))" -ForegroundColor Green
         }
@@ -38,4 +60,4 @@ foreach ($adapter in $allAdapters) {
 }
 
 Write-Host "------------------------------------------------"
-Write-Host "Verificação concluída." -ForegroundColor Cyan
+Write-Host "VerificaÃ§Ã£o concluÃ­da.`n" -ForegroundColor Cyan
